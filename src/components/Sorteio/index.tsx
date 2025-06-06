@@ -25,68 +25,70 @@ export default function SorteioExcel() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
+  
     setFileName(file.name);
-
+    setWinners([]); // <--- limpa o resultado anterior
+  
     const reader = new FileReader();
     reader.readAsBinaryString(file);
-
+  
     reader.onload = (e) => {
       const binaryString = e.target?.result;
       const workbook = XLSX.read(binaryString, { type: "binary" });
-
+  
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-
+  
       const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-      const headerRowIndex = 0; // Ajuste aqui se o cabeçalho mudar de linha
+  
+      const headerRowIndex = 0;
       if (jsonData.length >= headerRowIndex + 1 && Array.isArray(jsonData[headerRowIndex])) {
         const headers = jsonData[headerRowIndex].map((header) => String(header).trim());
-
+  
         const formattedData = jsonData
           .slice(headerRowIndex + 1)
           .map((row, rowIndex) => {
             if (!Array.isArray(row)) return {};
-
+  
             const isEmpty = row.every(cell => cell === undefined || cell === null || cell === "");
-
+  
             if (isEmpty) return null;
-
+  
             const obj: { [key: string]: unknown } = { 'Número da Linha': rowIndex + headerRowIndex + 2 };
-
+  
             headers.forEach((header, colIndex) => {
               let cellValue = row[colIndex];
-
+  
               if (header === "Carimbo de data/hora" && cellValue) {
                 let dateValue: Date;
-
+  
                 if (typeof cellValue === "number") {
                   dateValue = new Date((cellValue - 25569) * 86400000);
                 } else {
                   dateValue = new Date(cellValue);
                 }
-
+  
                 if (!isNaN(dateValue.getTime())) {
                   cellValue = `${String(dateValue.getDate()).padStart(2, '0')}/${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(2, '0')}:${String(dateValue.getMinutes()).padStart(2, '0')}:${String(dateValue.getSeconds()).padStart(2, '0')}`;
                 } else {
                   cellValue = "Data inválida";
                 }
               }
-
+  
               obj[header] = cellValue !== undefined ? cellValue : "";
             });
-
+  
             return obj;
           })
           .filter(row => row !== null);
-
+  
         setData(formattedData as Record<string, unknown>[]);
       } else {
         console.error("Erro ao processar o arquivo: a linha de cabeçalho não é válida.");
       }
     };
   };
+  
 
   const handleSorteio = () => {
     if (data.length === 0) return;
