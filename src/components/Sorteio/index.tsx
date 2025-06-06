@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { CloudUpload, Download } from "lucide-react";
+import ExportButton from "./components/ExportButton";
 
 // Função para mascarar CPF - agora aceita string ou número e converte para string internamente
 function maskCPF(cpf: string | number): string {
@@ -148,7 +149,7 @@ export default function SorteioExcel() {
 
   return (
     <div className="p-6 flex flex-col items-center">
-      <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-lg">
+      <div className="bg-white shadow-md rounded-lg px-6 pt-6 w-full max-w-lg">
         <div className="flex items-center justify-between w-full">
           <label className="cursor-pointer flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-400 rounded-lg py-6 bg-gray-50 hover:bg-gray-100 transition">
             <CloudUpload size={40} className="text-blue-500 mb-2" />
@@ -159,6 +160,11 @@ export default function SorteioExcel() {
           </label>
         </div>
 
+        <div className="flex justify-center items-center text-black m-2">
+          <div className="flex items-center">
+            <ExportButton />
+          </div>
+        </div>
         {data.length > 0 && (
           <>
             <div className="mt-4">
@@ -176,7 +182,7 @@ export default function SorteioExcel() {
             <button
               onClick={handleSorteio}
               ref={botaoRef}
-              className="w-full px-4 py-2 mt-4 bg-blue-500 text-white rounded font-semibold hover:bg-blue-600 transition"
+              className="w-full px-4 py-2 mt-4 mb-4 bg-blue-500 text-white rounded font-semibold hover:bg-blue-600 transition"
             >
               Sortear
             </button>
