@@ -5,14 +5,12 @@ import * as XLSX from "xlsx";
 import { CloudUpload, Download } from "lucide-react";
 import ExportButton from "./components/ExportButton";
 
-// Função para mascarar CPF - agora aceita string ou número e converte para string internamente
-function maskCPF(cpf: string | number): string {
-  const strCpf = String(cpf);  // <-- Garantindo que seja string
-  const cleaned = strCpf.replace(/\D/g, '');
+// Função para mascarar CPF - aceita qualquer tipo, converte para string internamente
+function maskCPF(cpf: unknown): string {
+  const strCpf = String(cpf).replace(/[^0-9Xx]/g, "").toUpperCase();
 
-  if (cleaned.length !== 11) return strCpf;
-
-  return `***.${cleaned.slice(3, 6)}.${cleaned.slice(7, 9)}*-**`;
+  if (strCpf.length !== 11) return String(cpf);
+  return `***.${strCpf.slice(3, 6)}.${strCpf.slice(6, 8)}*-**`;
 }
 
 export default function SorteioExcel() {
@@ -26,70 +24,77 @@ export default function SorteioExcel() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-  
+
     setFileName(file.name);
-    setWinners([]); // <--- limpa o resultado anterior
-  
+    setWinners([]); // Limpa o resultado anterior
+
     const reader = new FileReader();
     reader.readAsBinaryString(file);
-  
+
     reader.onload = (e) => {
       const binaryString = e.target?.result;
       const workbook = XLSX.read(binaryString, { type: "binary" });
-  
+
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-  
+
       const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-  
+
       const headerRowIndex = 0;
       if (jsonData.length >= headerRowIndex + 1 && Array.isArray(jsonData[headerRowIndex])) {
         const headers = jsonData[headerRowIndex].map((header) => String(header).trim());
-  
+
         const formattedData = jsonData
           .slice(headerRowIndex + 1)
           .map((row, rowIndex) => {
             if (!Array.isArray(row)) return {};
-  
-            const isEmpty = row.every(cell => cell === undefined || cell === null || cell === "");
-  
+
+            const isEmpty = row.every((cell) => cell === undefined || cell === null || cell === "");
+
             if (isEmpty) return null;
-  
-            const obj: { [key: string]: unknown } = { 'Número da Linha': rowIndex + headerRowIndex + 2 };
-  
+
+            const obj: { [key: string]: unknown } = { "Número da Linha": rowIndex + headerRowIndex + 2 };
+
             headers.forEach((header, colIndex) => {
               let cellValue = row[colIndex];
-  
+
               if (header === "Carimbo de data/hora" && cellValue) {
                 let dateValue: Date;
-  
+
                 if (typeof cellValue === "number") {
                   dateValue = new Date((cellValue - 25569) * 86400000);
                 } else {
                   dateValue = new Date(cellValue);
                 }
-  
+
                 if (!isNaN(dateValue.getTime())) {
-                  cellValue = `${String(dateValue.getDate()).padStart(2, '0')}/${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(2, '0')}:${String(dateValue.getMinutes()).padStart(2, '0')}:${String(dateValue.getSeconds()).padStart(2, '0')}`;
+                  cellValue = `${String(dateValue.getDate()).padStart(2, "0")}/${String(
+                    dateValue.getMonth() + 1
+                  ).padStart(2, "0")}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(
+                    2,
+                    "0"
+                  )}:${String(dateValue.getMinutes()).padStart(2, "0")}:${String(dateValue.getSeconds()).padStart(
+                    2,
+                    "0"
+                  )}`;
                 } else {
                   cellValue = "Data inválida";
                 }
               }
-  
+
               obj[header] = cellValue !== undefined ? cellValue : "";
             });
-  
+
             return obj;
           })
-          .filter(row => row !== null);
-  
+          .filter((row) => row !== null);
+
         setData(formattedData as Record<string, unknown>[]);
       } else {
         console.error("Erro ao processar o arquivo: a linha de cabeçalho não é válida.");
       }
     };
   };
-  
 
   const handleSorteio = () => {
     if (data.length === 0) return;
@@ -106,18 +111,15 @@ export default function SorteioExcel() {
     const dataWithTextFormat = winners.map((item: Record<string, unknown>) => {
       const newItem: Record<string, unknown> = {};
 
-      columnNames.forEach(col => {
+      columnNames.forEach((col) => {
         let value = item[col];
 
-        // Se for CPF, aplica a máscara - agora sempre converte para string
-        if (col.toLowerCase().includes('cpf') && value != null) {
-          value = maskCPF(String(value));
+        // Se for CPF ou Documento, aplica a máscara
+        if ((col.toLowerCase().includes("cpf") || col.toLowerCase().includes("documento")) && value != null) {
+          value = maskCPF(value);
         }
 
-
-        newItem[col] = typeof value === 'number' && value > 9999999999
-          ? String(value)
-          : value;
+        newItem[col] = typeof value === "number" && value > 9999999999 ? String(value) : value;
       });
 
       return newItem;
@@ -126,14 +128,14 @@ export default function SorteioExcel() {
     const headers = [columnNames];
     const dataWithHeaders = [
       ...headers,
-      ...dataWithTextFormat.map(item => columnNames.map(col => item[col] || ""))
+      ...dataWithTextFormat.map((item) => columnNames.map((col) => item[col] || ""))
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(dataWithHeaders);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Sorteados");
 
-    worksheet['!cols'] = columnNames.map(col => ({
+    worksheet["!cols"] = columnNames.map((col) => ({
       wch: col.length + 5
     }));
 
@@ -142,8 +144,8 @@ export default function SorteioExcel() {
 
   const columnNames: string[] = data[0] ? Object.keys(data[0]) : [];
 
-  const handleKeyUp = (event: { key: string; preventDefault: () => void; }) => {
-    if (event.key === 'Enter') {
+  const handleKeyUp = (event: { key: string; preventDefault: () => void }) => {
+    if (event.key === "Enter") {
       event.preventDefault();
       botaoRef.current?.click();
     }
@@ -155,9 +157,7 @@ export default function SorteioExcel() {
         <div className="flex items-center justify-between w-full">
           <label className="cursor-pointer flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-400 rounded-lg py-6 bg-gray-50 hover:bg-gray-100 transition">
             <CloudUpload size={40} className="text-blue-500 mb-2" />
-            <span className="text-gray-600 font-semibold">
-              {fileName ? `📂 ${fileName}` : "Clique para enviar um arquivo"}
-            </span>
+            <span className="text-gray-600 font-semibold">{fileName ? `📂 ${fileName}` : "Clique para enviar um arquivo"}</span>
             <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
           </label>
         </div>
@@ -208,14 +208,18 @@ export default function SorteioExcel() {
               <thead>
                 <tr className="bg-blue-500">
                   {columnNames.map((column, index) => (
-                    <th key={index} className="border p-2 text-left text-white">{column}</th>
+                    <th key={index} className="border p-2 text-left text-white">
+                      {column}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {winners.length === 0 ? (
                   <tr>
-                    <td colSpan={columnNames.length} className="text-center p-2">Nenhum sorteado</td>
+                    <td colSpan={columnNames.length} className="text-center p-2">
+                      Nenhum sorteado
+                    </td>
                   </tr>
                 ) : (
                   winners.map((item, index) => (
@@ -223,13 +227,15 @@ export default function SorteioExcel() {
                       {columnNames.map((column, colIndex) => {
                         let cellValue = item[column] ?? "Sem valor";
 
-                        // Verifica se é CPF - agora sempre converte para string antes de mascarar
-                        if (column.toLowerCase().includes('cpf') && cellValue != null) {
-                          cellValue = maskCPF(String(cellValue));
+                        // Aplica máscara se for CPF ou Documento
+                        if ((column.toLowerCase().includes("cpf") || column.toLowerCase().includes("documento")) && cellValue != null) {
+                          cellValue = maskCPF(cellValue);
                         }
 
                         return (
-                          <td key={colIndex} className="border p-2">{String(cellValue)}</td>
+                          <td key={colIndex} className="border p-2">
+                            {String(cellValue)}
+                          </td>
                         );
                       })}
                     </tr>
